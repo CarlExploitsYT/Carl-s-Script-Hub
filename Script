@@ -1,0 +1,556 @@
+-- Carl's Script Hub 
+-- Variables for toggles and states
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local rootPart = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+local flyEnabled = false
+local noclipEnabled = false
+local speedEnabled = false
+local heavenlySightEnabled = false
+local godmodeEnabled = false
+local infResourcesEnabled = false
+local radiantStormEnabled = false
+local angelicArmorEnabled = false
+local touchStartPos = nil
+local touchDelta = Vector2.new(0, 0)
+local isMobile = game:GetService("UserInputService").TouchEnabled -- Mobile detection for Delta/Krnl
+_G.MobileMode = isMobile -- Reduce particles for mobile
+
+-- Custom GUI Setup
+local gui = Instance.new("ScreenGui")
+gui.Name = "CarlsScriptHub"
+gui.ResetOnSpawn = false
+gui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 400)
+frame.Position = UDim2.new(0.5, -150, 0.5, -200)
+frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Black
+frame.BorderColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+frame.Active = true
+frame.Draggable = true -- Native Roblox dragging
+frame.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+title.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+title.Text = "Carl's Script Hub"
+title.TextScaled = true
+title.Parent = frame
+
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -30, 0, 0)
+closeButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255) -- White
+closeButton.Text = "X"
+closeButton.TextScaled = true
+closeButton.Parent = frame
+
+-- ScrollFrame for buttons
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, 0, 1, -30)
+scrollFrame.Position = UDim2.new(0, 0, 0, 30)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 600) -- Adjust for content
+scrollFrame.ScrollBarThickness = 5
+scrollFrame.Parent = frame
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.Padding = UDim.new(0, 5)
+uiListLayout.Parent = scrollFrame
+
+-- Notification Function
+local function notify(message, duration)
+    local notification = Instance.new("TextLabel")
+    notification.Size = UDim2.new(0, 200, 0, 50)
+    notification.Position = UDim2.new(0.5, -100, 0, 10)
+    notification.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    notification.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+    notification.Text = message
+    notification.TextScaled = true
+    notification.Parent = gui
+    game:GetService("Debris"):AddItem(notification, duration)
+end
+notify("Carl’s Script Hub Loaded! Drag to move, X to close.", 5)
+
+-- Fly Script (Enhanced)
+local function toggleFly()
+    flyEnabled = not flyEnabled
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    local bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.P = 15000 -- Increased for smoother control
+    bodyGyro.D = 750 -- Adjusted for stability
+
+    if flyEnabled then
+        bodyVelocity.Parent = rootPart
+        bodyGyro.Parent = rootPart
+        local wingEffect = Instance.new("ParticleEmitter")
+        wingEffect.Texture = "rbxassetid://7733964719" -- Yellow star
+        wingEffect.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255)) -- White
+        wingEffect.Size = NumberSequence.new(0.5)
+        wingEffect.Lifetime = NumberRange.new(1, 2)
+        wingEffect.Rate = _G.MobileMode and 20 or 40 -- Optimized for mobile
+        wingEffect.Parent = rootPart
+        notify(_G.MobileMode and "Fly On - Swipe to move, tap Ascend/Descend!" or "Fly On - Use WASD/Space/Ctrl!", 3)
+        spawn(function()
+            while flyEnabled do
+                local moveDirection = Vector3.new(0, 0, 0)
+                local camera = workspace.CurrentCamera
+                if _G.MobileMode and touchDelta.Magnitude > 0 then
+                    local speed = 40 -- Smoother mobile scaling
+                    moveDirection = moveDirection + (camera.CFrame.LookVector * touchDelta.Y * speed + camera.CFrame.RightVector * touchDelta.X * speed)
+                end
+                local uis = game.UserInputService
+                if uis:IsKeyDown(Enum.KeyCode.W) then
+                    moveDirection = moveDirection + (camera.CFrame.LookVector * 60) -- Faster PC
+                end
+                if uis:IsKeyDown(Enum.KeyCode.S) then
+                    moveDirection = moveDirection - (camera.CFrame.LookVector * 60)
+                end
+                if uis:IsKeyDown(Enum.KeyCode.Space) then
+                    moveDirection = moveDirection + Vector3.new(0, 60, 0)
+                end
+                if uis:IsKeyDown(Enum.KeyCode.LeftControl) then
+                    moveDirection = moveDirection - Vector3.new(0, 60, 0)
+                end
+                bodyVelocity.Velocity = moveDirection
+                bodyGyro.CFrame = camera.CFrame
+                task.wait()
+            end
+        end)
+        wingEffect:Destroy()
+    else
+        bodyVelocity:Destroy()
+        bodyGyro:Destroy()
+        notify("Fly Off - Returned to earthly bounds.", 3)
+    end
+end
+
+-- Touch Input for Fly (Smoother Mobile)
+if _G.MobileMode then
+    game:GetService("UserInputService").TouchStarted:Connect(function(input)
+        touchStartPos = input.Position
+    end)
+    game:GetService("UserInputService").TouchMoved:Connect(function(input)
+        if touchStartPos then
+            touchDelta = (input.Position - touchStartPos).Unit * 0.5 -- Smoother sensitivity
+        end
+    end)
+    game:GetService("UserInputService").TouchEnded:Connect(function()
+        touchStartPos = nil
+        touchDelta = Vector2.new(0, 0)
+    end)
+end
+
+-- Noclip Script
+local function toggleNoclip()
+    noclipEnabled = not noclipEnabled
+    spawn(function()
+        game:GetService("RunService").Stepped:Connect(function()
+            if noclipEnabled then
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    end)
+    notify(noclipEnabled and "Noclip On - Pass through the mortal plane!" or "Noclip Off - Bound by earthly limits.", 3)
+end
+
+-- Speed Hack
+local function toggleSpeed()
+    speedEnabled = not speedEnabled
+    humanoid.WalkSpeed = speedEnabled and 120 or 16
+    notify(speedEnabled and "Speed On - Dash with angelic swiftness!" or "Speed Off - Back to mortal pace.", 3)
+end
+
+-- Heavenly Sight (ESP)
+local function toggleHeavenlySight()
+    heavenlySightEnabled = not heavenlySightEnabled
+    for _, plr in pairs(game.Players:GetPlayers()) do
+        if plr ~= player then
+            if heavenlySightEnabled then
+                local highlight = Instance.new("Highlight")
+                highlight.FillColor = Color3.fromRGB(255, 255, 0) -- Yellow
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255) -- White
+                highlight.FillTransparency = 0.5
+                highlight.Parent = plr.Character
+                local particle = Instance.new("ParticleEmitter")
+                particle.Texture = "rbxassetid://7733964719" -- Yellow star
+                particle.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255)) -- White
+                particle.Size = NumberSequence.new(0.5)
+                particle.Lifetime = NumberRange.new(1, 2)
+                particle.Rate = _G.MobileMode and 20 or 40 -- Mobile optimization
+                particle.Parent = plr.Character.HumanoidRootPart
+            else
+                for _, obj in pairs(plr.Character:GetChildren()) do
+                    if obj:IsA("Highlight") or obj:IsA("ParticleEmitter") then
+                        obj:Destroy()
+                    end
+                end
+            end
+        end
+    end
+    notify(heavenlySightEnabled and "Heavenly Sight On - Behold mortals in divine light!" or "Heavenly Sight Off - Divine vision faded.", 3)
+end
+
+-- Godmode
+local function toggleGodmode()
+    godmodeEnabled = not godmodeEnabled
+    humanoid.MaxHealth = godmodeEnabled and math.huge or 100
+    humanoid.Health = godmodeEnabled and math.huge or 100
+    notify(godmodeEnabled and "Godmode On - Blessed with divine protection!" or "Godmode Off - Returned to mortal frailty.", 3)
+end
+
+-- Infinite Resources (Credits)
+local function toggleInfResources()
+    infResourcesEnabled = not infResourcesEnabled
+    if infResourcesEnabled then
+        if player.leaderstats and player.leaderstats:FindFirstChild("Credits") then
+            player.leaderstats.Credits.Value = math.huge
+            spawn(function()
+                game:GetService("RunService").Heartbeat:Connect(function()
+                    if infResourcesEnabled then
+                        player.leaderstats.Credits.Value = math.huge
+                    end
+                end)
+            end)
+            notify("Infinite Credits On - Heavenly riches abound!", 3)
+        else
+            infResourcesEnabled = false
+            notify("Error - Credits not found in leaderstats!", 5)
+        end
+    else
+        notify("Infinite Credits Off - Riches returned to mortal limits.", 3)
+    end
+end
+
+-- Radiant Storm (Weather)
+local function toggleRadiantStorm()
+    radiantStormEnabled = not radiantStormEnabled
+    local lighting = game:GetService("Lighting")
+    if radiantStormEnabled then
+        lighting.Atmosphere.Density = 0.7
+        lighting.Atmosphere.Color = Color3.fromRGB(255, 255, 0) -- Yellow
+        local storm = Instance.new("ParticleEmitter")
+        storm.Texture = "rbxassetid://7733964719" -- Yellow star
+        storm.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255)) -- White
+        storm.Size = NumberSequence.new(1)
+        storm.Lifetime = NumberRange.new(2, 5)
+        storm.Rate = _G.MobileMode and 40 or 80 -- Mobile optimization
+        storm.Parent = workspace.Terrain
+        notify("Radiant Storm On - Heaven’s light engulfs the land!", 3)
+    else
+        lighting.Atmosphere.Density = 0.3
+        lighting.Atmosphere.Color = Color3.fromRGB(255, 255, 255)
+        for _, obj in pairs(workspace.Terrain:GetChildren()) do
+            if obj:IsA("ParticleEmitter") then
+                obj:Destroy()
+            end
+        end
+        notify("Radiant Storm Off - Skies return to calm.", 3)
+    end
+end
+
+-- Teleport to Player
+local function teleportToPlayer(targetPlayer)
+    local target = game.Players:FindFirstChild(targetPlayer)
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        rootPart.CFrame = target.Character.HumanoidRootPart.CFrame
+        local teleportEffect = Instance.new("ParticleEmitter")
+        teleportEffect.Texture = "rbxassetid://7733964719" -- Yellow star
+        teleportEffect.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0)) -- Yellow
+        teleportEffect.Size = NumberSequence.new(2)
+        teleportEffect.Lifetime = NumberRange.new(0.5, 1)
+        teleportEffect.Rate = _G.MobileMode and 80 or 160 -- Mobile optimization
+        teleportEffect.Parent = rootPart
+        wait(1)
+        teleportEffect:Destroy()
+        notify("Teleported - Divinely zapped to " .. targetPlayer .. "!", 3)
+    else
+        notify("Teleport Failed - Player not found!", 5)
+    end
+end
+
+-- Heavenly Aura
+local function toggleHeavenlyAura()
+    local aura = Instance.new("ParticleEmitter")
+    aura.Texture = "rbxassetid://7733964719" -- Yellow star
+    aura.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0)) -- Yellow
+    aura.Size = NumberSequence.new(1)
+    aura.Lifetime = NumberRange.new(1, 3)
+    aura.Rate = _G.MobileMode and 40 or 80 -- Mobile optimization
+    aura.Parent = rootPart
+    notify("Heavenly Aura On - You shine with divine radiance!", 3)
+end
+
+-- Holy Comet (Meteor)
+local function summonHolyComet()
+    local comet = Instance.new("Part")
+    comet.Size = Vector3.new(5, 5, 5)
+    comet.Position = rootPart.Position + Vector3.new(0, 50, 0)
+    comet.Anchored = false
+    comet.BrickColor = BrickColor.new("Institutional white") -- White
+    comet.Parent = workspace
+    local particle = Instance.new("ParticleEmitter")
+    particle.Texture = "rbxassetid://7733964719" -- Yellow star
+    particle.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0)) -- Yellow
+    particle.Size = NumberSequence.new(2)
+    particle.Lifetime = NumberRange.new(1, 3)
+    particle.Rate = _G.MobileMode and 40 or 80 -- Mobile optimization
+    particle.Parent = comet
+    game:GetService("Debris"):AddItem(comet, 5)
+    notify("Holy Comet Summoned - A celestial blaze descends!", 3)
+end
+
+-- Divine Proclamation (Hologram)
+local function toggleDivineProclamation()
+    local hologram = Instance.new("BillboardGui")
+    hologram.Size = UDim2.new(5, 0, 5, 0)
+    hologram.Adornee = rootPart
+    hologram.Parent = rootPart
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = "Carl Ascends!"
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    textLabel.TextScaled = true
+    textLabel.Parent = hologram
+    game:GetService("Debris"):AddItem(hologram, 10)
+    notify("Divine Proclamation - Your celestial glory shines!", 3)
+end
+
+-- Angelic Armor (Mech Suit)
+local function toggleAngelicArmor()
+    angelicArmorEnabled = not angelicArmorEnabled
+    if angelicArmorEnabled then
+        local suit = Instance.new("Model")
+        suit.Name = "AngelicArmor"
+        suit.Parent = character
+        local armor = Instance.new("Part")
+        armor.Size = Vector3.new(6, 8, 6)
+        armor.Transparency = 0.5
+        armor.BrickColor = BrickColor.new("Institutional white") -- White
+        armor.Position = rootPart.Position
+        armor.Parent = suit
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = rootPart
+        weld.Part1 = armor
+        weld.Parent = armor
+        local particle = Instance.new("ParticleEmitter")
+        particle.Texture = "rbxassetid://7733964719" -- Yellow star
+        particle.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0)) -- Yellow
+        particle.Size = NumberSequence.new(1)
+        particle.Lifetime = NumberRange.new(1, 2)
+        particle.Rate = _G.MobileMode and 40 or 80 -- Mobile optimization
+        particle.Parent = armor
+        notify("Angelic Armor On - You’re a celestial guardian!", 3)
+    else
+        for _, obj in pairs(character:GetChildren()) do
+            if obj.Name == "AngelicArmor" then
+                obj:Destroy()
+            end
+        end
+        notify("Angelic Armor Off - Returned to mortal form.", 3)
+    end
+end
+
+-- GUI Buttons and Sliders
+local function createButton(text, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -10, 0, 30)
+    button.Position = UDim2.new(0, 5, 0, 0)
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    button.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+    button.Text = text
+    button.TextScaled = true
+    button.Parent = scrollFrame
+    button.MouseButton1Click:Connect(callback)
+end
+
+local function createToggle(text, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -10, 0, 30)
+    button.Position = UDim2.new(0, 5, 0, 0)
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    button.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+    button.Text = text .. " (Off)"
+    button.TextScaled = true
+    button.Parent = scrollFrame
+    local state = false
+    button.MouseButton1Click:Connect(function()
+        state = not state
+        button.Text = text .. (state and " (On)" or " (Off)")
+        callback(state)
+    end)
+end
+
+local function createSlider(text, min, max, default, callback)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(1, -10, 0, 50)
+    sliderFrame.Position = UDim2.new(0, 5, 0, 0)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.Parent = scrollFrame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 255, 255) -- White
+    label.Text = text .. ": " .. default
+    label.TextScaled = true
+    label.Parent = sliderFrame
+
+    local slider = Instance.new("TextButton")
+    slider.Size = UDim2.new(1, 0, 0, 20)
+    slider.Position = UDim2.new(0, 0, 0, 30)
+    slider.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    slider.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+    slider.Text = ""
+    slider.Parent = sliderFrame
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- White
+    fill.Parent = slider
+
+    local dragging = false
+    slider.MouseButton1Down:Connect(function()
+        dragging = true
+    end)
+    game:GetService("UserInputService").InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local mousePos = input.Position.X
+            local sliderPos = slider.AbsolutePosition.X
+            local sliderWidth = slider.AbsoluteSize.X
+            local relative = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
+            local value = min + (max - min) * relative
+            value = math.floor(value + 0.5) -- Round to nearest integer
+            fill.Size = UDim2.new(relative, 0, 1, 0)
+            label.Text = text .. ": " .. value
+            callback(value)
+        end
+    end)
+end
+
+local function createDropdown(text, items, callback)
+    local dropdownFrame = Instance.new("Frame")
+    dropdownFrame.Size = UDim2.new(1, -10, 0, 30)
+    dropdownFrame.Position = UDim2.new(0, 5, 0, 0)
+    dropdownFrame.BackgroundTransparency = 1
+    dropdownFrame.Parent = scrollFrame
+
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    button.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+    button.Text = text .. ": Select"
+    button.TextScaled = true
+    button.Parent = dropdownFrame
+
+    local listFrame = Instance.new("Frame")
+    listFrame.Size = UDim2.new(1, 0, 0, 100)
+    listFrame.Position = UDim2.new(0, 0, 1, 0)
+    listFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Black
+    listFrame.BorderColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+    listFrame.Visible = false
+    listFrame.Parent = dropdownFrame
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = listFrame
+
+    local function updateDropdownItems()
+        for _, child in pairs(listFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
+        end
+        for _, item in pairs(items) do
+            local itemButton = Instance.new("TextButton")
+            itemButton.Size = UDim2.new(1, 0, 0, 25)
+            itemButton.BackgroundColor3 = Color3.fromRGB(255, 255, 0) -- Yellow
+            itemButton.TextColor3 = Color3.fromRGB(0, 0, 0) -- Black
+            itemButton.Text = item
+            itemButton.TextScaled = true
+            itemButton.Parent = listFrame
+            itemButton.MouseButton1Click:Connect(function()
+                button.Text = text .. ": " .. item
+                listFrame.Visible = false
+                callback(item)
+            end)
+        end
+        listFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+    end
+    updateDropdownItems()
+
+    button.MouseButton1Click:Connect(function()
+        listFrame.Visible = not listFrame.Visible
+    end)
+
+    return { Refresh = updateDropdownItems }
+end
+
+-- GUI Elements
+createToggle("Fly (Swipe/Ascend/Descend)", toggleFly)
+createButton("Ascend", function()
+    if flyEnabled then
+        rootPart.Velocity = rootPart.Velocity + Vector3.new(0, 60, 0)
+    end
+end)
+createButton("Descend", function()
+    if flyEnabled then
+        rootPart.Velocity = rootPart.Velocity + Vector3.new(0, -60, 0)
+    end
+end)
+createToggle("Noclip", toggleNoclip)
+createToggle("Speed Hack (120)", toggleSpeed)
+createToggle("Heavenly Sight", toggleHeavenlySight)
+createToggle("Godmode", toggleGodmode)
+createToggle("Infinite Credits", toggleInfResources)
+createSlider("Gravity", 0, 200, 196, function(value)
+    workspace.Gravity = value
+    notify("Gravity Adjusted - Set to " .. value .. "!", 3)
+end)
+createToggle("Radiant Storm", toggleRadiantStorm)
+createButton("Holy Comet", summonHolyComet)
+createButton("Divine Proclamation", toggleDivineProclamation)
+createToggle("Angelic Armor", toggleAngelicArmor)
+createButton("Heavenly Aura", toggleHeavenlyAura)
+local playerDropdown = createDropdown("Teleport to Player", {}, teleportToPlayer)
+createSlider("FOV", 50, 120, 70, function(value)
+    workspace.CurrentCamera.FieldOfView = value
+    notify("FOV Adjusted - Set to " .. value .. "!", 3)
+end)
+
+-- Dynamic Player Dropdown
+spawn(function()
+    while true do
+        local players = {}
+        for _, plr in pairs(game.Players:GetPlayers()) do
+            table.insert(players, plr.Name)
+        end
+        playerDropdown.Refresh(players)
+        task.wait(5)
+    end
+end)
+
+-- Close GUI
+closeButton.MouseButton1Click:Connect(function()
+    gui:Destroy()
+    notify("GUI Closed - Divine interface vanished!", 3)
+end)
+
+notify("Carl’s Script Hub Ready - Ascend and conquer!", 5)
